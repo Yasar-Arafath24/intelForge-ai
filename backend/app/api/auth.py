@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from app.auth.password import verify_password
+from app.auth.jwt import create_access_token
 
 from app.schemas.auth import (
+    LoginRequest,
     RegisterRequest,
-    VerifyOTPRequest
+    TokenResponse,
+    VerifyOTPRequest,
 )
 
 from app.services.user_service import (
@@ -137,3 +141,51 @@ def verify_otp(
     return {
         "message": "Email verified successfully"
     }
+    
+@router.post("/login", response_model=TokenResponse)
+def login_user(
+    request: LoginRequest,
+    db: Session = Depends(get_db)
+):
+
+    user = get_user_by_email(
+        db,
+        request.email
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    if not verify_password(
+        request.password,
+        user.password_hash
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    if not user.email_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Email not verified. Please verify your OTP first."
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="Account is inactive"
+        )
+
+    token = create_access_token({
+        "sub": str(user.id),
+        "email": user.email
+    })
+
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer"
+    )
