@@ -1,15 +1,21 @@
 from fastapi import FastAPI
-from app.db.database import engine, Base
+
+from app.api.auth import router as auth_router
 
 
 app = FastAPI(
-    title="IntelForge AI API",
-    version="1.0.0"
+    title="IntelForge AI"
+)
+
+
+app.include_router(
+    auth_router
 )
 
 
 @app.get("/")
 def root():
+
     return {
-        "message": "IntelForge AI Backend Running"
+        "message": "IntelForge AI API Running"
     }
