@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from app.services.otp_service import create_email_otp
 
 from app.schemas.auth import RegisterRequest
 from app.services.user_service import (
@@ -43,11 +44,14 @@ def register_user(
     )
 
 
-    otp = generate_otp()
+    otp_record = create_email_otp(
+        db=db,
+        user_id=user.id
+    )
 
 
     return {
-        "message": "User registered successfully",
-        "user_id": user.id,
-        "otp_debug": otp
-    }
+    "message": "User registered successfully",
+    "user_id": user.id,
+    "otp_debug": otp_record.otp_code
+}
