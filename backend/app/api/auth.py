@@ -1,15 +1,29 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.services.otp_service import create_email_otp
 
-from app.schemas.auth import RegisterRequest
+from app.schemas.auth import (
+    RegisterRequest,
+    VerifyOTPRequest
+)
+
 from app.services.user_service import (
     create_user,
     get_user_by_email
 )
 
+from app.services.otp_service import (
+    create_email_otp
+)
+
+from app.services.otp_verify_service import (
+    verify_email_otp
+)
+
+from app.services.email_service import (
+    send_otp_email
+)
+
 from app.db.database import get_db
-from app.auth.otp import generate_otp
 
 
 router = APIRouter(
@@ -18,12 +32,17 @@ router = APIRouter(
 )
 
 
+# ==================================================
+# REGISTER USER + SEND OTP
+# ==================================================
+
 @router.post("/register")
-def register_user(
+async def register_user(
     request: RegisterRequest,
     db: Session = Depends(get_db)
 ):
 
+    # Check existing email
     existing_user = get_user_by_email(
         db,
         request.email
@@ -36,6 +55,7 @@ def register_user(
         )
 
 
+    # Create user
     user = create_user(
         db=db,
         name=request.name,
@@ -44,14 +64,76 @@ def register_user(
     )
 
 
+    # Generate OTP
     otp_record = create_email_otp(
         db=db,
         user_id=user.id
     )
 
 
+    # Send OTP Email
+    try:
+        await send_otp_email(
+            receiver_email=user.email,
+            otp_code=otp_record.otp_code
+        )
+
+    except Exception as e:
+        db.delete(otp_record)
+        db.delete(user)
+        db.commit()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Email sending failed: {str(e)}"
+        )
+
+
     return {
-    "message": "User registered successfully",
-    "user_id": user.id,
-    "otp_debug": otp_record.otp_code
-}
+        "message": "User registered successfully. OTP sent to email.",
+        "user_id": user.id
+    }
+
+
+
+# ==================================================
+# VERIFY EMAIL OTP
+# ==================================================
+
+@router.post("/verify-otp")
+def verify_otp(
+    request: VerifyOTPRequest,
+    db: Session = Depends(get_db)
+):
+
+    # Find user using email
+    user = get_user_by_email(
+        db,
+        request.email
+    )
+
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+
+    # Verify OTP
+    verified = verify_email_otp(
+        db=db,
+        user_id=user.id,
+        otp_code=request.otp_code
+    )
+
+
+    if not verified:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired OTP"
+        )
+
+
+    return {
+        "message": "Email verified successfully"
+    }

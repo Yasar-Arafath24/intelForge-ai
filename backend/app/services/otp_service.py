@@ -1,10 +1,15 @@
+import random
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy.orm import Session
 
 from app.models.email_otp import EmailOTP
-from app.auth.otp import (
-    generate_otp,
-    get_otp_expiry
-)
+
+
+def generate_otp():
+
+    return str(random.randint(100000,999999))
+
 
 
 def create_email_otp(
@@ -12,16 +17,21 @@ def create_email_otp(
     user_id: str
 ):
 
-    otp_code = generate_otp()
+    otp = generate_otp()
+
 
     otp_record = EmailOTP(
         user_id=user_id,
-        otp_code=otp_code,
-        expires_at=get_otp_expiry()
+        otp_code=otp,
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10)
     )
 
+
     db.add(otp_record)
+
     db.commit()
+
     db.refresh(otp_record)
+
 
     return otp_record

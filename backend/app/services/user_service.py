@@ -13,7 +13,7 @@ def create_user(
 
     user = User(
         name=name,
-        email=email,
+        email=email.strip().lower(),
         password_hash=hash_password(password)
     )
 
@@ -32,7 +32,7 @@ def get_user_by_email(
     return (
         db.query(User)
         .filter(
-            User.email == email
+            User.email == email.strip().lower()
         )
         .first()
     )
