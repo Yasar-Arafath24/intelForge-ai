@@ -42,3 +42,12 @@ def get_user_by_email(
         )
         .first()
     )
+    
+def get_user_by_id(
+    db,
+    user_id
+):
+
+    return db.query(User).filter(
+        User.id == user_id
+    ).first()
